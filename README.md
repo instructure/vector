@@ -1,8 +1,8 @@
 # Vector
 
-Vector is a tool that augments your auto-scaling groups. Currently the
-only additional feature it provides is Predictive Scaling based on
-historical data.
+Vector is a tool that augments your auto-scaling groups. The two
+features currently offered are Predictive Scaling and Flexible Down
+Scaling.
 
 ## Predictive scaling
 
@@ -42,11 +42,24 @@ to come up with a representation of load across the group makes sense.
 For things like CPUUtilization this is true. Other metric types should
 be thought through.
 
-## Installation
+## Flexible Down Scaling
 
-```bash
-$ gem install vector
-```
+Auto Scaling Groups support the concept of "cooldown periods" - a window
+of time after a scaling activity where no other activities should take
+place. This is to give the group a chance to settle into the new
+configuration before deciding whether another action is required.
+
+However, Auto Scaling Groups only support specifying the cooldown period
+*after* a certain activity - you can say "After a scale up, wait 5
+minutes before doing anything else, and after a scale down, wait 15
+minutes." What you can't do is say "After a scale up, wait 5 minutes for
+another scale up, and 40 minutes for a scale down."
+
+Vector lets you add custom up-to-down and down-to-down cooldown periods.
+You create your policies and alarms in your Auto Scaling Groups like
+normal, and then *disable* the alarm you want a custom cooldown period
+applied to. Then you tell Vector what cooldown periods to use, and he
+does the rest.
 
 ## Requirements
 
@@ -55,6 +68,12 @@ $ gem install vector
  * Auto Scaling groups must have at least one scaling policy with a
    positive adjustment, and that policy must have at least one
    CloudWatch alarm with a CPUUtilization metric.
+
+## Installation
+
+```bash
+$ gem install vector
+```
 
 ## Usage
 
@@ -68,6 +87,10 @@ First create a configuration file:
 # correctly, it needs to know what timezone you want time arithmetic to
 # happen in.
 timezone: America/Denver
+
+# What region this configuration is for. To run Vector between different
+# regions, typically you will have separate config files.
+region: us-east-1
 
 groups:
   - my-asg-group1
@@ -125,3 +148,12 @@ If we don't look at the actual utilization and just look
 at how many instances we were running in the past, we will end up
 scaling earlier and earlier, and will never re-adjust and not scale up
 if load patterns change, and we don't need so much capacity.
+
+### What about high availability? What if the box Vector is running on
+ dies?
+
+Luckily Vector is just providing optimizations - the critical component
+of scaling up based on demand is still provided by the normal Auto
+Scaling service. If Vector does not run, you just don't get the
+predictive scaling and down scaling.
+
