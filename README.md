@@ -100,15 +100,18 @@ groups:
   - my-asg-group2
 
 predictive-scaling:
+  # enable the Predictive Scaling function
+  enabled: true
+
   # A list of windows of time to look back. CloudWatch only
   # stores data for 2 weeks, so you can't go back any further than that.
-  # (required)
+  # (required if enabled)
   lookback-windows:
     - 1w
     - 2w
 
   # How far ahead of time to attempt to scale up.
-  # (required)
+  # (required if enabled)
   lookahead-window: 1h
 
   # A value from 0 - 1.0 that specifies how closely current load
@@ -125,7 +128,11 @@ predictive-scaling:
   valid-period: 10m
 
 flexible-down-scaling:
-  # TODO: document cooldown periods
+  # enable the Flexible Down Scaling function
+  enabled: true
+
+  # Specify how long you want to wait for a scaledown with the two
+  # options below.
   up-to-down-cooldown: 45m
   down-to-down-cooldown: 10m
 ```
