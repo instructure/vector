@@ -155,8 +155,7 @@ at how many instances we were running in the past, we will end up
 scaling earlier and earlier, and will never re-adjust and not scale up
 if load patterns change, and we don't need so much capacity.
 
-### What about high availability? What if the box Vector is running on
- dies?
+### What about high availability? What if the box Vector is running on dies?
 
 Luckily Vector is just providing optimizations - the critical component
 of scaling up based on demand is still provided by the normal Auto
