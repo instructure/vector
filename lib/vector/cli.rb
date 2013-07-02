@@ -19,6 +19,7 @@ module Vector
                else
                  @config[:groups].map do |group_name|
                    auto_scaling.groups[group_name]
+                 end
                end
 
       if @config[:predictive_scaling][:enabled]
@@ -91,7 +92,7 @@ module Vector
           opts[:groups] = v
         end
 
-        o.on("--fleet fleet", "An AWS ASG Fleet (instead of specifying a list of Groups") do |v|
+        o.on("--fleet fleet", "An AWS ASG Fleet (instead of specifying --groups)") do |v|
           opts[:fleet] = v
         end
 
@@ -132,12 +133,12 @@ module Vector
           opts[:flexible_down_scaling][:enabled] = v
         end
 
-        o.on("--fds-up-to-down-cooldown DURATION", String, "The cooldown period between up and down scale events") do |v|
+        o.on("--fds-up-to-down DURATION", String, "The cooldown period between up and down scale events") do |v|
           opts[:flexible_down_scaling][:up_to_down_cooldown] =
             Vector.time_string_to_seconds v
         end
 
-        o.on("--fds-down-to-down-cooldown DURATION", String, "The cooldown period between down and down scale events") do |v|
+        o.on("--fds-down-to-down DURATION", String, "The cooldown period between down and down scale events") do |v|
           opts[:flexible_down_scaling][:down_to_down_cooldown] =
             Vector.time_string_to_seconds v
         end

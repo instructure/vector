@@ -92,7 +92,7 @@ DURATION can look like 60s, 1m, 5h, 7d, 1w
         --timezone TIMEZONE          Timezone to use for date calculations (like America/Denver) (default: system timezone)
         --region REGION              AWS region to operate in (default: us-east-1)
         --groups group1,group2       A list of Auto Scaling Groups to evaluate
-        --fleet fleet                An AWS ASG Fleet (instead of specifying a list of Groups
+        --fleet fleet                An AWS ASG Fleet (instead of specifying --groups)
     -v, --[no-]verbose               Run verbosely
 
 Predictive Scaling Options
@@ -106,10 +106,8 @@ Predictive Scaling Options
 
 Flexible Down Scaling Options
         --[no-]fds                   Enable Flexible Down Scaling
-        --fds-up-to-down-cooldown DURATION
-                                     The cooldown period between up and down scale events
-        --fds-down-to-down-cooldown DURATION
-                                     The cooldown period between down and down scale events
+        --fds-up-to-down DURATION    The cooldown period between up and down scale events
+        --fds-down-to-down DURATION  The cooldown period between down and down scale events
 ```
 
 # Questions
