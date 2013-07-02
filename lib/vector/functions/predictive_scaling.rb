@@ -2,19 +2,11 @@ module Vector
   module Function
     class PredictiveScaling
       def initialize(options)
-        @cloudwatch = AWS::CloudWatch.new
-
-        @lookback_windows = options['lookback-windows'] || []
-        @lookback_windows = @lookback_windows.map do |w|
-          [ w, Vector.time_string_to_seconds(w) ]
-        end
-
-        @lookahead_window = Vector.time_string_to_seconds(
-          options['lookahead-window'])
-
-        @valid_threshold = options['valid-threshold'].to_f
-
-        @valid_period = Vector.time_string_to_seconds options['valid-period']
+        @cloudwatch = options[:cloudwatch]
+        @lookback_windows = options[:lookback_windows]
+        @lookahead_window = options[:lookahead_window]
+        @valid_threshold = options[:valid_threshold]
+        @valid_period = options[:valid_period]
       end
 
       def run_for(group)

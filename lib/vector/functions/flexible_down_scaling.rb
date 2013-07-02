@@ -2,10 +2,9 @@ module Vector
   module Function
     class FlexibleDownScaling
       def initialize(options)
-        @cloudwatch = AWS::CloudWatch.new
-
-        @up_down_cooldown = Vector.time_string_to_seconds options['up-to-down-cooldown']
-        @down_down_cooldown = Vector.time_string_to_seconds options['down-to-down-cooldown']
+        @cloudwatch = options[:cloudwatch]
+        @up_down_cooldown = options[:up_down_cooldown]
+        @down_down_cooldown = options[:down_down_cooldown]
       end
 
       def run_for(group)

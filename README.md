@@ -81,69 +81,35 @@ does the rest.
 $ gem install vector
 ```
 
-## Configuration
-
-Vector needs a configuration file:
-
-```yaml
-# Predictive scaling looks back in time, and in order to handle DST
-# correctly, it needs to know what timezone you want time arithmetic to
-# happen in.
-timezone: America/Denver
-
-# What region this configuration is for. To run Vector between different
-# regions, typically you will have separate config files.
-region: us-east-1
-
-groups:
-  - my-asg-group1
-  - my-asg-group2
-
-predictive-scaling:
-  # enable the Predictive Scaling function
-  enabled: true
-
-  # A list of windows of time to look back. CloudWatch only
-  # stores data for 2 weeks, so you can't go back any further than that.
-  # (required if enabled)
-  lookback-windows:
-    - 1w
-    - 2w
-
-  # How far ahead of time to attempt to scale up.
-  # (required if enabled)
-  lookahead-window: 1h
-
-  # A value from 0 - 1.0 that specifies how closely current load
-  # must match the load from $lookback_window ago in order for
-  # predictive scaling to take place. This lets you only do predictive
-  # scaling only if current load is similar to past load.
-  # 
-  # If this value is not specified, predictive scaling will take
-  # place no matter what current load is.
-  # (optional)
-  valid-threshold: 0.8
-
-  # The period to use when doing the threshold check from above.
-  valid-period: 10m
-
-flexible-down-scaling:
-  # enable the Flexible Down Scaling function
-  enabled: true
-
-  # Specify how long you want to wait for a scaledown with the two
-  # options below.
-  up-to-down-cooldown: 45m
-  down-to-down-cooldown: 10m
-```
-
 ## Usage
 
 Typically vector will be invoked via cron periodically (every 10 minutes
 is a good choice.)
 
-```bash
-$ vector -c config.yml
+```
+Usage: vector [options]
+DURATION can look like 60s, 1m, 5h, 7d, 1w
+        --timezone TIMEZONE          Timezone to use for date calculations (like America/Denver) (default: system timezone)
+        --region REGION              AWS region to operate in (default: us-east-1)
+        --groups group1,group2       A list of Auto Scaling Groups to evaluate
+        --fleet fleet                An AWS ASG Fleet (instead of specifying a list of Groups
+    -v, --[no-]verbose               Run verbosely
+
+Predictive Scaling Options
+        --[no-]ps                    Enable Predictive Scaling
+        --ps-lookback-windows DURATION,DURATION
+                                     List of lookback windows
+        --ps-lookahead-window DURATION
+                                     Lookahead window
+        --ps-valid-threshold FLOAT   A number from 0.0 - 1.0 specifying how closely previous load must match current load for Predictive Scaling to take effect
+        --ps-valid-period DURATION   The period to use when doing the threshold check
+
+Flexible Down Scaling Options
+        --[no-]fds                   Enable Flexible Down Scaling
+        --fds-up-to-down-cooldown DURATION
+                                     The cooldown period between up and down scale events
+        --fds-down-to-down-cooldown DURATION
+                                     The cooldown period between down and down scale events
 ```
 
 # Questions
