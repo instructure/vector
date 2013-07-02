@@ -42,6 +42,12 @@ to come up with a representation of load across the group makes sense.
 For things like CPUUtilization this is true. Other metric types should
 be thought through.
 
+If you use Predictive Scaling, you probably also want to use Flexible
+Down Scaling (below) so that after scaling up in prediction of load,
+your scaledown policy doesn't quickly undo Vector's hard work. You
+probably want to set `up-to-down-cooldown` to be close to the size of
+your `lookahead-window`.
+
 ## Flexible Down Scaling
 
 Auto Scaling Groups support the concept of "cooldown periods" - a window
@@ -75,12 +81,9 @@ does the rest.
 $ gem install vector
 ```
 
-## Usage
+## Configuration
 
-Typically vector will be invoked via cron periodically (every 10 minutes
-is a good choice.)
-
-First create a configuration file:
+Vector needs a configuration file:
 
 ```yaml
 # Predictive scaling looks back in time, and in order to handle DST
@@ -127,18 +130,14 @@ flexible-down-scaling:
   down-to-down-cooldown: 10m
 ```
 
-And run Vector:
+## Usage
+
+Typically vector will be invoked via cron periodically (every 10 minutes
+is a good choice.)
 
 ```bash
 $ vector -c config.yml
 ```
-
-When Vector decides that a predictive scaleup should happen, it will
-trigger the policy attached to the alarm that was being evaluated.
-
-When Vector sees that a scaledown alarm is ACTIVE and the proper
-cooldown period has passed, it will trigger the associated policy to
-scaledown.
 
 # Questions
 
