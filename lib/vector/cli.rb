@@ -1,6 +1,8 @@
 require 'optparse'
 require 'aws-sdk'
 require 'aws/auto_scaling/fleets'
+require 'vector/functions/flexible_down_scaling'
+require 'vector/functions/predictive_scaling'
 
 module Vector
   class CLI
@@ -11,8 +13,8 @@ module Vector
     def run
       load_config
 
-      auto_scaling = AWS::AutoScaling(:region => @config[:region])
-      cloudwatch = AWS::CloudWatch(:region => @config[:region])
+      auto_scaling = AWS::AutoScaling.new(:region => @config[:region])
+      cloudwatch = AWS::CloudWatch.new(:region => @config[:region])
 
       groups = if @config[:fleet]
                  auto_scaling.fleets[@config[:fleet]].groups
@@ -25,7 +27,7 @@ module Vector
       if @config[:predictive_scaling][:enabled]
         psconf = @config[:predictive_scaling]
 
-        ps = Vector::Functions::PredictiveScaling.new(
+        ps = Vector::Function::PredictiveScaling.new(
           :cloudwatch => cloudwatch,
           :lookback_windows => psconf[:lookback_windows],
           :lookahead_window => psconf[:lookahead_window],
@@ -34,14 +36,18 @@ module Vector
         )
 
         groups.each do |group|
-          ps.run_for(group)
+          begin
+            ps.run_for(group)
+          rescue => e
+            puts "error performing Predictive Scaling on #{group.name}: #{e.inspect}\n#{e.backtrace.join "\n"}"
+          end
         end
       end
 
       if @config[:flexible_down_scaling][:enabled]
         fdsconf = @config[:flexible_down_scaling]
 
-        fds = Vector::Functions::FlexibleDownScaling.new(
+        fds = Vector::Function::FlexibleDownScaling.new(
           :cloudwatch => cloudwatch,
           :up_down_cooldown => fdsconf[:up_to_down_cooldown],
           :down_down_cooldown => fdsconf[:down_to_down_cooldown]

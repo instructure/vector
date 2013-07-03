@@ -20,30 +20,48 @@ module Vector
             alarm = @cloudwatch.alarms[alarm_name]
             next unless alarm.enabled?
 
-            @lookback_windows.each do |window_name, window_time|
-              now_load, now_num = load_for(group, alarm,
-                Time.now, @valid_period)
+            now_load, now_num = load_for(group, alarm.metric,
+              Time.now, @valid_period)
 
-              then_load, = load_for(group, alarm,
-                Time.now - window_time, @valid_period)
+            if now_load.nil?
+              puts "#{group.name}: could not get current load for metric #{alarm.metric.name}"
+              next
+            end
 
-              # check that the past total utilization is within
-              # threshold% of the current total utilization
-              if !Vector.within_threshold(@load_threshold,
-                                          now_load, then_load)
+            @lookback_windows.each do |window|
+              then_load, = load_for(group, alarm.metric,
+                Time.now - window, @valid_period)
+
+              if then_load.nil?
+                puts "#{group.name}: could not get -#{window.inspect} load for metric #{alarm.metric.name}"
                 next
               end
 
-              past_load, = load_for(group,
-                Time.now - window_time + @lookahead_window,
+              # check that the past total utilization is within
+              # threshold% of the current total utilization
+              if !Vector.within_threshold(@valid_threshold,
+                                          now_load, then_load)
+                puts "#{group.name}: past load not within threshold (current #{now_load}, then #{then_load})"
+                next
+              end
+
+              past_load, = load_for(group, alarm.metric,
+                Time.now - window + @lookahead_window,
                 alarm.period)
+
+              if past_load.nil?
+                puts "#{group.name}: could not get -#{window.inspect} +#{@lookahead_window.inspect} load for metric #{alarm.metric.name}"
+                next
+              end
 
               # now take the past total load and divide it by the
               # current number of instances to get the predicted avg
               # load
               predicted_load = past_load.to_f / now_num
+              puts "#{group.name}: predicted load: #{predicted_load}"
 
               if check_alarm_threshold(alarm, predicted_load)
+                puts "#{group.name}: executing policy #{policy.name}"
                 policy.execute
               end
             end
@@ -73,7 +91,11 @@ module Vector
           filter('dimensions', [{
             :name => 'AutoScalingGroupName',
             :value => group.name
-          }])
+          }]).first
+
+        unless num_instances_metric
+          raise "Could not find GroupInServicesInstances metric for #{group.name}"
+        end
 
         start_time = time - (window / 2)
         end_time = time + (window / 2)
@@ -82,13 +104,13 @@ module Vector
         num = average_for_metric(num_instances_metric, start_time, end_time)
 
         if avg.nil? || num.nil?
-          raise "Could not get load for #{group.name} #{metric.name}"
+          return [ nil, nil ]
         end
 
         [ avg * num, num ]
       end
 
-      def average_for_metric(metric, start_time, stop_time)
+      def average_for_metric(metric, start_time, end_time)
         stats = metric.statistics(
           :start_time => start_time,
           :end_time => end_time,
