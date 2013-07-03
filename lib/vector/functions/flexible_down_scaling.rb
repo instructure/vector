@@ -19,43 +19,55 @@ module Vector
           # only evaluate scaling *down* policies
           next if policy.scaling_adjustment >= 0
 
-          policy.alarms.keys.each do |alarm_name|
-            alarm = @cloudwatch.alarms[alarm_name]
+          alarms = policy.alarms.keys.map do |alarm_name|
+            @cloudwatch.alarms[alarm_name]
+          end
 
-            # skip alarms that have actions enabled, because they will
-            # have already triggered the scaledown
-            next if alarm.enabled?
+          # only consider disabled alarms (enabled alarms will trigger
+          # the policy automatically)
+          disabled_alarms = alarms.select do |alarm|
+            !alarm.enabled?
+          end
 
-            # if the alarm isn't in the ALARM state, then we don't need
-            # to go any further because we won't attempt to scaledown
-            # anyway
-            next if alarm.state_value != "ALARM"
+          if disabled_alarms.all? {|alarm| alarm.state_value == "ALARM" } &&
+              outside_cooldown_period(group)
 
-            # now check that we're outside required cooldown periods
-            activities = previous_scaling_activities(group)
-
-            # don't do anything if there was an issue finding activities
-            next if activities.nil?
-
-            # check up-down
-            if @up_down_cooldown && activities[:up] &&
-              Time.now - activities[:up] < @up_down_cooldown
-              next
-            end
-
-            # check down-down
-            if @down_down_cooldown && activities[:down] &&
-              Time.now - activities[:down] < @down_down_cooldown
-              next
-            end
-
-            # ok we're outside cooldown windows, trigger the policy!!
+            # all alarms triggered, and we're outside the cooldown.
             policy.execute
+
+            # no need to evaluate other scaledown policies
+            return
           end
         end
       end
 
       protected
+
+      def outside_cooldown_period(group)
+        @cached_outside_cooldown ||= {}
+        if @cached_outside_cooldown.has_key? group
+          return @cached_outside_cooldown[group]
+        end
+
+        activities = previous_scaling_activities(group)
+        return nil if activities.nil?
+
+        result = true
+
+        # check up-down
+        if @up_down_cooldown && activities[:up] &&
+          Time.now - activities[:up] < @up_down_cooldown
+          result = false
+        end
+
+        # check down-down
+        if @down_down_cooldown && activities[:down] &&
+          Time.now - activities[:down] < @down_down_cooldown
+          result = false
+        end
+
+        result
+      end
 
       # Looks at the GroupDesiredCapacity metric for the specified
       # group, and finds the most recent change in value.

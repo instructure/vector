@@ -67,6 +67,14 @@ normal, and then *disable* the alarm you want a custom cooldown period
 applied to. Then you tell Vector what cooldown periods to use, and he
 does the rest.
 
+Another benefit to Flexible Down Scaling is the ability to specify
+multiple alarms for a scaling down policy and require *all* alarms to
+trigger before scaling down. With Vector, you can add multiple
+(disabled) alarms to a policy, and Vector will trigger the policy only
+when *both* alarms are in ALARM state. This lets you do something like
+"only scale down when CPU utilization is < 30% and there is not a
+backlog of requests on any instances".
+
 ## Requirements
 
  * Auto Scaling groups must have the GroupInServiceInstances metric
