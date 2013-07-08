@@ -15,10 +15,11 @@ module Vector
         # already at the minimum size...
         return nil if group.desired_capacity == group.min_size
 
-        group.scaling_policies.each do |policy|
-          # only evaluate scaling *down* policies
-          next if policy.scaling_adjustment >= 0
+        scaledown_policies = group.scaling_policies.select do |policy|
+          policy.scaling_adjustment < 0
+        end
 
+        scaledown_policies.each do |policy|
           alarms = policy.alarms.keys.map do |alarm_name|
             @cloudwatch.alarms[alarm_name]
           end
