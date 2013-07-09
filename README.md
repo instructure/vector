@@ -71,6 +71,8 @@ your `lookahead-window`.
 
 ## Flexible Down Scaling
 
+### Different Cooldown Periods
+
 Auto Scaling Groups support the concept of "cooldown periods" - a window
 of time after a scaling activity where no other activities should take
 place. This is to give the group a chance to settle into the new
@@ -88,6 +90,8 @@ normal, and then *disable* the alarm you want a custom cooldown period
 applied to. Then you tell Vector what cooldown periods to use, and he
 does the rest.
 
+### Multiple Alarms
+
 Another benefit to Flexible Down Scaling is the ability to specify
 multiple alarms for a scaling down policy and require *all* alarms to
 trigger before scaling down. With Vector, you can add multiple
@@ -95,6 +99,21 @@ trigger before scaling down. With Vector, you can add multiple
 when *both* alarms are in ALARM state. This lets you do something like
 "only scale down when CPU utilization is < 30% and there is not a
 backlog of requests on any instances".
+
+### Max Sunk Cost
+
+Vector also lets you specify a "max sunk cost" when scaling down a node.
+Amazon bills on hourly increments, and you pay a full hour for every
+partial hour used, so you want your instances to terminate as close to
+their hourly billing renewal (without going past it).
+
+For example, if you specify `--fds-max-sunk-cost 15m` and have two nodes
+in your group - 47 minutes and 32 minutes away from their hourly billing
+renewals - the group will not be scaled down.
+
+(You should make sure to run Vector on an interval smaller than this
+one, or else it's possible Vector may never find eligible nodes for
+scaledown and never scaledown.)
 
 ## Requirements
 
@@ -137,6 +156,7 @@ Flexible Down Scaling Options
         --[no-]fds                   Enable Flexible Down Scaling
         --fds-up-to-down DURATION    The cooldown period between up and down scale events
         --fds-down-to-down DURATION  The cooldown period between down and down scale events
+        --fds-max-sunk-cost DURATION Only let a scaledown occur if there is an instance this close to its hourly billing point
 ```
 
 # Questions
