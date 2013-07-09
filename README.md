@@ -49,16 +49,16 @@ For example:
 > 1 week lookback window, a 1 hour lookahead window, and a valid-threshold
 > of 0.8.
 > 
-> The current value of CPUUtilization is 49, and there are 2 nodes in the
-> group. CPUUtilization 1 week ago was 53, and there were 2 nodes in the
-> group. Therefore, total current CPUUtilization is 98, and 1 week ago was
-> 106. Those are within 80% of each other (valid-threshold), so we can
+> The current value of CPUUtilization is 49%, and there are 2 nodes in the
+> group. CPUUtilization 1 week ago was 53%, and there were 2 nodes in the
+> group. Therefore, total current CPUUtilization is 98%, and 1 week ago was
+> 106%. Those are within 80% of each other (valid-threshold), so we can
 > continue with the prediction.
 > 
-> The value of CPUUtilization 1 week ago, **plus** 1 hour was 45, and
+> The value of CPUUtilization 1 week ago, **plus** 1 hour was 45%, and
 > there were 4 nodes in the group. We calculate total CPUUtilization for
-> that time to be 180. Assuming no new nodes are launched, the predicted
-> average CPUUtilization for the group 1 hour from now is 180 / 2 = 90%.
+> that time to be 180%. Assuming no new nodes are launched, the predicted
+> average CPUUtilization for the group 1 hour from now is 180% / 2 = 90%.
 > 90% is above the alarm's 75% threshold, so we trigger the scaleup
 > policy.
 
