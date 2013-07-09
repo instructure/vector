@@ -25,7 +25,7 @@ Vector examines your existing CloudWatch alarms tied to your Auto
 Scaling groups, and predicts if they will be triggered in the future
 based on what happened in the past.
 
-*Note* This only works with metrics that are averaged across your group -
+**Note:** This only works with metrics that are averaged across your group -
 like CPUUtilization or Load. If you auto-scale based on something
 like QueueLength, Predictive Scaling will not work right for you.
 
@@ -55,7 +55,7 @@ For example:
 > 106%. Those are within 80% of each other (valid-threshold), so we can
 > continue with the prediction.
 > 
-> The value of CPUUtilization 1 week ago, **plus** 1 hour was 45%, and
+> The value of CPUUtilization 1 week ago, *plus* 1 hour was 45%, and
 > there were 4 nodes in the group. We calculate total CPUUtilization for
 > that time to be 180%. Assuming no new nodes are launched, the predicted
 > average CPUUtilization for the group 1 hour from now is 180% / 2 = 90%.
