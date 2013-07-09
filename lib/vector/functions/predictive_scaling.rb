@@ -31,11 +31,13 @@ module Vector
                     next
                   end
 
+                  # Note that everywhere we say "load" what we mean is
+                  # "metric value * number of nodes"
                   now_load, now_num = load_for(group, alarm.metric,
                     Time.now, @valid_period)
 
                   if now_load.nil?
-                    hlog "Could not get current load for metric"
+                    hlog "Could not get current total for metric"
                     next
                   end
 
@@ -45,7 +47,7 @@ module Vector
                         Time.now - window, @valid_period)
 
                       if then_load.nil?
-                        hlog "Could not get past load for metric"
+                        hlog "Could not get past total value for metric"
                         next
                       end
 
@@ -53,7 +55,7 @@ module Vector
                       # threshold% of the current total utilization
                       if @valid_threshold &&
                         !Vector.within_threshold(@valid_threshold, now_load, then_load)
-                        hlog "Past load not within threshold (current #{now_load}, then #{then_load})"
+                        hlog "Past metric total value not within threshold (current #{now_load}, then #{then_load})"
                         next
                       end
 
@@ -62,17 +64,16 @@ module Vector
                         alarm.period)
 
                       if past_load.nil?
-                        hlog "Could not get past + #{@lookahead_window.inspect} load for metric"
+                        hlog "Could not get past + #{@lookahead_window.inspect} total value for metric"
                         next
                       end
 
                       # now take the past total load and divide it by the
-                      # current number of instances to get the predicted avg
-                      # load
-                      predicted_load = past_load.to_f / now_num
-                      hlog "Predicted load: #{predicted_load}"
+                      # current number of instances to get the predicted value
+                      predicted_value = past_load.to_f / now_num
+                      hlog "Predicted #{alarm.metric.name}: #{predicted_load}"
 
-                      if check_alarm_threshold(alarm, predicted_load)
+                      if check_alarm_threshold(alarm, predicted_value)
                         hlog "Executing policy"
                         policy.execute(honor_cooldown: true)
 

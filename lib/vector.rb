@@ -31,6 +31,11 @@ module Vector
   end
 
   module HLogger
+    @@enabled = false
+    def self.enable(bool)
+      @@enabled = bool
+    end
+
     def hlog_ctx(ctx, &block)
       @components ||= []
       @components << ctx
@@ -40,6 +45,8 @@ module Vector
     end
 
     def hlog(string)
+      return unless @@enabled
+
       tmp_components = @components.dup
       level = 0
       if @last_components

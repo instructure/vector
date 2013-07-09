@@ -1,4 +1,4 @@
-Copyright (c) 2013 Zach Wily
+Copyright (c) 2013 Instructure, Inc
 
 MIT License
 

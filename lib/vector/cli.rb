@@ -101,6 +101,7 @@ module Vector
 
         o.on("-v", "--[no-]verbose", "Run verbosely") do |v|
           opts[:verbose] = v
+          Vector::HLogger.enable(true)
         end
 
         o.separator ""
