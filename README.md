@@ -22,25 +22,46 @@ Some reasons you might want to do that are:
    you actually need the capacity so you can begin evasive maneuvers.
 
 Vector examines your existing CloudWatch alarms tied to your Auto
-Scaling groups, and checks those metrics in the past. It does this by
-comparing the "Load" of the metric in the past versus the present. The
-"Load" of a metric is defined as the metric_value *
-number_of_current_instances.
+Scaling groups, and predicts if they will be triggered in the future
+based on what happened in the past.
 
-Vector will first check the metric load right now and the metric load in
-the past, based on the lookback window. If those are within a threshold,
-we assume that the future will mirror the past and continue.
+*Note* This only works with metrics that are averaged across your group
+- like CPUUtilization or Load. If you auto-scale based on something
+like QueueLength, Predictive Scaling will not work right for you.
 
-Vector then retrieves the load of the metric from the past plus the
-lookahead window. That load is divided by the current number of
-instances to get the "predicted load". That value is compared against
-the alarm, and if it would send the alarm into ALARM state, it triggers
-the scaleup policy.
+For each lookback window you specify, Vector will first check the
+current value of the metric * the number of nodes, and the past value of
+the metric * the past number of nodes. If those numbers are close enough
+(within the threshold specified by `--ps-valid-threshold`), then it will
+continue.
 
-This method will only work if multiplying your metric by # of instances
-to come up with a representation of load across the group makes sense.
-For things like CPUUtilization this is true. Other metric types should
-be thought through.
+Vector will then go back to the lookback window specified, and then
+forward in time based on the lookahead window (`--ps-lookahead-window`).
+It will compute the metric * number of nodes then to get a predicted
+aggregate metric value for the current future. It then divides that by
+the current number of nodes to get a predicted average value for the
+metric. That is then compared against the alarm's threshold.
+
+For example:
+
+> You have an alarm that checks CPUUtilization of your group, and will
+> trigger the alarm if that goes above 70%. Vector is configured to use a
+> 1 week lookback window, a 1 hour lookahead window, and a valid-threshold
+> of 0.8.
+> 
+> The current value of CPUUtilization is 49, and there are 2 nodes in the
+> group. CPUUtilization 1 week ago was 53, and there were 2 nodes in the
+> group. Therefor, total current CPUUtilization is 98, and 1 week ago was
+> 106. Those are within 80% of each other (valid-threshold), so we can
+> continue with the prediction.
+> 
+> The value of CPUUtilization 1 week ago, **plus** 1 hour was 45, and
+> there were 4 nodes in the group. We calculate total CPUUtilization for
+> that time to be 180. Assuming no new nodes are launched, the predicted
+> average CPUUtilization for the group 1 hour from now is 180 / 2 = 90%.
+> 90% is above the alarm's 75% threshold, so we trigger the scaleup
+> policy.
+
 
 If you use Predictive Scaling, you probably also want to use Flexible
 Down Scaling (below) so that after scaling up in prediction of load,
