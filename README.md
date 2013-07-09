@@ -51,7 +51,7 @@ For example:
 > 
 > The current value of CPUUtilization is 49, and there are 2 nodes in the
 > group. CPUUtilization 1 week ago was 53, and there were 2 nodes in the
-> group. Therefor, total current CPUUtilization is 98, and 1 week ago was
+> group. Therefore, total current CPUUtilization is 98, and 1 week ago was
 > 106. Those are within 80% of each other (valid-threshold), so we can
 > continue with the prediction.
 > 
