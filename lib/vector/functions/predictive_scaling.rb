@@ -1,6 +1,8 @@
 module Vector
   module Function
     class PredictiveScaling
+      include Vector::HLogger
+
       def initialize(options)
         @cloudwatch = options[:cloudwatch]
         @lookback_windows = options[:lookback_windows]
@@ -10,59 +12,76 @@ module Vector
       end
 
       def run_for(group)
-        return if @lookback_windows.length == 0
+        hlog_ctx "group: #{group.name}" do
+          return if @lookback_windows.length == 0
 
-        group.scaling_policies.each do |policy|
-          # only examine scaleup policies
-          next if policy.scaling_adjustment <= 0
+          scaleup_policies = group.scaling_policies.select do |policy|
+            policy.scaling_adjustment > 0
+          end
 
-          policy.alarms.keys.each do |alarm_name|
-            alarm = @cloudwatch.alarms[alarm_name]
-            next unless alarm.enabled?
+          scaleup_policies.each do |policy|
+            hlog_ctx "policy: #{policy.name}" do
 
-            now_load, now_num = load_for(group, alarm.metric,
-              Time.now, @valid_period)
+              policy.alarms.keys.each do |alarm_name|
+                alarm = @cloudwatch.alarms[alarm_name]
+                hlog_ctx "alarm: #{alarm.name} (metric #{alarm.metric.name})" do
 
-            if now_load.nil?
-              puts "#{group.name}: could not get current load for metric #{alarm.metric.name}"
-              next
-            end
+                  unless alarm.enabled?
+                    hlog "Skipping disabled alarm"
+                    next
+                  end
 
-            @lookback_windows.each do |window|
-              then_load, = load_for(group, alarm.metric,
-                Time.now - window, @valid_period)
+                  now_load, now_num = load_for(group, alarm.metric,
+                    Time.now, @valid_period)
 
-              if then_load.nil?
-                puts "#{group.name}: could not get -#{window.inspect} load for metric #{alarm.metric.name}"
-                next
-              end
+                  if now_load.nil?
+                    hlog "Could not get current load for metric"
+                    next
+                  end
 
-              # check that the past total utilization is within
-              # threshold% of the current total utilization
-              if !Vector.within_threshold(@valid_threshold,
-                                          now_load, then_load)
-                puts "#{group.name}: past load not within threshold (current #{now_load}, then #{then_load})"
-                next
-              end
+                  @lookback_windows.each do |window|
+                    hlog_ctx "window: #{window.inspect}" do
+                      then_load, = load_for(group, alarm.metric,
+                        Time.now - window, @valid_period)
 
-              past_load, = load_for(group, alarm.metric,
-                Time.now - window + @lookahead_window,
-                alarm.period)
+                      if then_load.nil?
+                        hlog "Could not get past load for metric"
+                        next
+                      end
 
-              if past_load.nil?
-                puts "#{group.name}: could not get -#{window.inspect} +#{@lookahead_window.inspect} load for metric #{alarm.metric.name}"
-                next
-              end
+                      # check that the past total utilization is within
+                      # threshold% of the current total utilization
+                      if @valid_threshold &&
+                        !Vector.within_threshold(@valid_threshold, now_load, then_load)
+                        hlog "Past load not within threshold (current #{now_load}, then #{then_load})"
+                        next
+                      end
 
-              # now take the past total load and divide it by the
-              # current number of instances to get the predicted avg
-              # load
-              predicted_load = past_load.to_f / now_num
-              puts "#{group.name}: predicted load: #{predicted_load}"
+                      past_load, = load_for(group, alarm.metric,
+                        Time.now - window + @lookahead_window,
+                        alarm.period)
 
-              if check_alarm_threshold(alarm, predicted_load)
-                puts "#{group.name}: executing policy #{policy.name}"
-                policy.execute
+                      if past_load.nil?
+                        hlog "Could not get past + #{@lookahead_window.inspect} load for metric"
+                        next
+                      end
+
+                      # now take the past total load and divide it by the
+                      # current number of instances to get the predicted avg
+                      # load
+                      predicted_load = past_load.to_f / now_num
+                      hlog "Predicted load: #{predicted_load}"
+
+                      if check_alarm_threshold(alarm, predicted_load)
+                        hlog "Executing policy"
+                        policy.execute(honor_cooldown: true)
+
+                        # don't need to evaluate further windows or policies on this group
+                        return
+                      end
+                    end
+                  end
+                end
               end
             end
           end
