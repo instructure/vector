@@ -71,7 +71,7 @@ module Vector
                       # now take the past total load and divide it by the
                       # current number of instances to get the predicted value
                       predicted_value = past_load.to_f / now_num
-                      hlog "Predicted #{alarm.metric.name}: #{predicted_load}"
+                      hlog "Predicted #{alarm.metric.name}: #{predicted_value}"
 
                       if check_alarm_threshold(alarm, predicted_value)
                         hlog "Executing policy"

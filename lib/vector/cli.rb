@@ -59,7 +59,7 @@ module Vector
 
     def load_config
       opts = {
-        :verbose => false,
+        :quiet => false,
         :timezone => nil,
         :region => 'us-east-1',
         :groups => [],
@@ -99,9 +99,8 @@ module Vector
           opts[:fleet] = v
         end
 
-        o.on("-v", "--[no-]verbose", "Run verbosely") do |v|
-          opts[:verbose] = v
-          Vector::HLogger.enable(true)
+        o.on("-q", "--[no-]quiet", "Run quietly") do |v|
+          opts[:quiet] = v
         end
 
         o.separator ""
@@ -185,6 +184,8 @@ module Vector
           exit 1
         end
       end
+
+      Vector::HLogger.enable(!opts[:quiet])
 
       @config = opts
     end
