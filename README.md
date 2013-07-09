@@ -25,8 +25,8 @@ Vector examines your existing CloudWatch alarms tied to your Auto
 Scaling groups, and predicts if they will be triggered in the future
 based on what happened in the past.
 
-*Note* This only works with metrics that are averaged across your group
-- like CPUUtilization or Load. If you auto-scale based on something
+*Note* This only works with metrics that are averaged across your group -
+like CPUUtilization or Load. If you auto-scale based on something
 like QueueLength, Predictive Scaling will not work right for you.
 
 For each lookback window you specify, Vector will first check the
