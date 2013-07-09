@@ -2,9 +2,6 @@ require 'aws-sdk'
 require 'active_support/time'
 
 require 'vector/version'
-require 'vector/cli'
-require 'vector/functions/predictive_scaling'
-require 'vector/functions/flexible_down_scaling'
 
 module Vector
   def self.time_string_to_seconds(string)
@@ -32,4 +29,47 @@ module Vector
   def self.within_threshold(threshold, v1, v2)
     threshold * v1 < v2 && threshold * v2 < v1
   end
+
+  module HLogger
+    def hlog_ctx(ctx, &block)
+      @components ||= []
+      @components << ctx
+      yield
+    ensure
+      @components.pop
+    end
+
+    def hlog(string)
+      tmp_components = @components.dup
+      level = 0
+      if @last_components
+        @last_components.each do |last_c|
+          break if tmp_components.empty?
+          if last_c == tmp_components[0]
+            level += 1
+            tmp_components.shift
+          else
+            break
+          end
+        end
+      end
+
+      tmp_components.each do |component|
+        name = if component.respond_to? :name
+                 component.name
+               else
+                 component.to_s
+               end
+        puts "#{"  " * level}#{name}"
+        level += 1
+      end
+
+      puts "#{"  " * level}#{string}"
+      @last_components = @components.dup
+    end
+  end
 end
+
+require 'vector/cli'
+require 'vector/functions/predictive_scaling'
+require 'vector/functions/flexible_down_scaling'

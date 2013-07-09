@@ -16,6 +16,10 @@ module Vector
       auto_scaling = AWS::AutoScaling.new(:region => @config[:region])
       cloudwatch = AWS::CloudWatch.new(:region => @config[:region])
 
+      # everything we do should be fine looking at a snapshot in time,
+      # so memoizing should be fine when acting as a CLI.
+      AWS.start_memoizing
+
       groups = if @config[:fleet]
                  auto_scaling.fleets[@config[:fleet]].groups
                else
@@ -28,12 +32,7 @@ module Vector
         psconf = @config[:predictive_scaling]
 
         ps = Vector::Function::PredictiveScaling.new(
-          :cloudwatch => cloudwatch,
-          :lookback_windows => psconf[:lookback_windows],
-          :lookahead_window => psconf[:lookahead_window],
-          :valid_threshold => psconf[:valid_threshold],
-          :valid_period => psconf[:valid_period]
-        )
+          { :cloudwatch => cloudwatch }.merge(psconf))
 
         groups.each do |group|
           begin
@@ -48,10 +47,7 @@ module Vector
         fdsconf = @config[:flexible_down_scaling]
 
         fds = Vector::Function::FlexibleDownScaling.new(
-          :cloudwatch => cloudwatch,
-          :up_down_cooldown => fdsconf[:up_to_down_cooldown],
-          :down_down_cooldown => fdsconf[:down_to_down_cooldown]
-        )
+          { :cloudwatch => cloudwatch }.merge(fdsconf))
 
         groups.each do |group|
           fds.run_for(group)
@@ -77,8 +73,9 @@ module Vector
         },
         :flexible_down_scaling => {
           :enabled => false,
-          :up_to_down_cooldown => nil,
-          :down_to_down_cooldown => nil,
+          :up_down_cooldown => nil,
+          :down_down_cooldown => nil,
+          :max_sunk_cost => nil
         }
       }
 
@@ -140,13 +137,23 @@ module Vector
         end
 
         o.on("--fds-up-to-down DURATION", String, "The cooldown period between up and down scale events") do |v|
-          opts[:flexible_down_scaling][:up_to_down_cooldown] =
+          opts[:flexible_down_scaling][:up_down_cooldown] =
             Vector.time_string_to_seconds v
         end
 
         o.on("--fds-down-to-down DURATION", String, "The cooldown period between down and down scale events") do |v|
-          opts[:flexible_down_scaling][:down_to_down_cooldown] =
+          opts[:flexible_down_scaling][:down_down_cooldown] =
             Vector.time_string_to_seconds v
+        end
+
+        o.on("--fds-max-sunk-cost DURATION", String, "Only let a scaledown occur if there is an instance this close to its hourly billing point") do |v|
+          time = Vector.time_string_to_seconds v
+          if time > 1.hour
+            puts "--fds-max-sunk-cost duration must be < 1 hour"
+            exit 1
+          end
+
+          opts[:flexible_down_scaling][:max_sunk_cost] = time
         end
 
       end.parse!(@argv)
@@ -171,8 +178,8 @@ module Vector
 
       if opts[:flexible_down_scaling][:enabled]
         fds = opts[:flexible_down_scaling]
-        if fds[:up_to_down_cooldown].nil? ||
-           fds[:down_to_down_cooldown].nil?
+        if fds[:up_down_cooldown].nil? ||
+           fds[:down_down_cooldown].nil?
           puts "You must specify both up-to-down and down-to-down cooldown periods for Flexible Down Scaling."
           exit 1
         end
