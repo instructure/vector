@@ -12,19 +12,21 @@ module Vector
         @max_sunk_cost = options[:max_sunk_cost]
       end
 
-      def run_for(group)
+      def run_for(group, ps_check_procs)
+        result = { :triggered => false }
+
         hlog_ctx("group: #{group.name}") do
           # don't check if no config was specified
           if @up_down_cooldown.nil? && @down_down_cooldown.nil?
             hlog("No cooldown periods specified, exiting")
-            return nil
+            return result
           end
 
           # don't bother checking for a scaledown if desired capacity is
           # already at the minimum size...
           if group.desired_capacity == group.min_size
             hlog("Group is already at minimum size, exiting")
-            return nil
+            return result
           end
 
           scaledown_policies = group.scaling_policies.select do |policy|
@@ -33,6 +35,14 @@ module Vector
 
           scaledown_policies.each do |policy|
             hlog_ctx("policy: #{policy.name}") do
+              # TODO: support adjustment types other than ChangeInCapacity here
+              if policy.adjustment_type == "ChangeInCapacity" &&
+                 ps_check_procs.any? {|ps_check_proc|
+                   ps_check_proc.call(group.desired_capacity + policy.scaling_adjustment) }
+                hlog("Predictive scaleup would trigger a scaleup if group were shrunk")
+                next
+              end
+
               alarms = policy.alarms.keys.map do |alarm_name|
                 @cloudwatch.alarms[alarm_name]
               end
@@ -61,11 +71,15 @@ module Vector
               hlog("Executing policy")
               policy.execute(:honor_cooldown => true)
 
+              result[:triggered] = true
+
               # no need to evaluate other scaledown policies
-              return
+              return result
             end
           end
         end
+
+        result
       end
 
       protected

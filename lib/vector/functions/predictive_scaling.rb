@@ -12,8 +12,10 @@ module Vector
       end
 
       def run_for(group)
+        result = { :check_procs => [], :triggered => false }
+
         hlog_ctx "group: #{group.name}" do
-          return if @lookback_windows.length == 0
+          return result if @lookback_windows.length == 0
 
           scaleup_policies = group.scaling_policies.select do |policy|
             policy.scaling_adjustment > 0
@@ -70,15 +72,22 @@ module Vector
 
                       # now take the past total load and divide it by the
                       # current number of instances to get the predicted value
-                      predicted_value = past_load.to_f / now_num
-                      hlog "Predicted #{alarm.metric.name}: #{predicted_value}"
+                      check_proc = Proc.new do |num_nodes|
+                        predicted_value = past_load.to_f / num_nodes
+                        hlog "Predicted #{alarm.metric.name}: #{predicted_value} (#{num_nodes} nodes)"
 
-                      if check_alarm_threshold(alarm, predicted_value)
+                        check_alarm_threshold(alarm, predicted_value)
+                      end
+                      result[:check_procs] << check_proc
+
+                      if check_proc.call(now_num)
                         hlog "Executing policy"
                         policy.execute(honor_cooldown: true)
 
+                        result[:triggered] = true
+
                         # don't need to evaluate further windows or policies on this group
-                        return
+                        return result
                       end
                     end
                   end
@@ -87,6 +96,8 @@ module Vector
             end
           end
         end
+
+        result
       end
 
       protected

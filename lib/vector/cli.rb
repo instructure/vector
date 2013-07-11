@@ -28,29 +28,40 @@ module Vector
                  end
                end
 
+      ps = nil
       if @config[:predictive_scaling][:enabled]
         psconf = @config[:predictive_scaling]
-
         ps = Vector::Function::PredictiveScaling.new(
           { :cloudwatch => cloudwatch }.merge(psconf))
-
-        groups.each do |group|
-          begin
-            ps.run_for(group)
-          rescue => e
-            puts "error performing Predictive Scaling on #{group.name}: #{e.inspect}\n#{e.backtrace.join "\n"}"
-          end
-        end
       end
 
+      fds = nil
       if @config[:flexible_down_scaling][:enabled]
         fdsconf = @config[:flexible_down_scaling]
-
         fds = Vector::Function::FlexibleDownScaling.new(
           { :cloudwatch => cloudwatch }.merge(fdsconf))
+      end
 
-        groups.each do |group|
-          fds.run_for(group)
+      groups.each do |group|
+        begin
+          ps_check_procs = nil
+
+          if ps
+            ps_result = ps.run_for(group)
+            ps_check_procs = ps_result[:check_procs]
+
+            if ps_result[:triggered]
+              # Don't need to evaluate for scaledown if we triggered a scaleup
+              next
+            end
+          end
+
+          if fds
+            fds.run_for(group, ps_check_procs)
+          end
+
+        rescue => e
+          puts "error for #{group.name}: #{e.inspect}\n#{e.backtrace.join "\n"}"
         end
       end
     end

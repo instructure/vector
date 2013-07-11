@@ -115,6 +115,12 @@ renewals - the group will not be scaled down.
 one, or else it's possible Vector may never find eligible nodes for
 scaledown and never scaledown.)
 
+### Integration with Predictive Scaling
+
+Before scaling down, and if Predictive Scaling is in effect, Vector will
+check to see if the size **after** scaling down would trigger Predictive
+Scaling. If it would, the scaling policy will not be executed.
+
 ## Requirements
 
  * Auto Scaling groups must have the GroupInServiceInstances metric
