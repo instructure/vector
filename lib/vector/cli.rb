@@ -71,7 +71,6 @@ module Vector
     def load_config
       opts = {
         :quiet => false,
-        :timezone => nil,
         :region => 'us-east-1',
         :groups => [],
         :fleet => nil,
@@ -95,7 +94,7 @@ module Vector
         o.separator "DURATION can look like 60s, 1m, 5h, 7d, 1w"
 
         o.on("--timezone TIMEZONE", "Timezone to use for date calculations (like America/Denver) (default: system timezone)") do |v|
-          opts[:timezone] = v
+          Time.zone = v
         end
 
         o.on("--region REGION", "AWS region to operate in (default: us-east-1)") do |v|
