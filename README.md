@@ -86,9 +86,8 @@ another scale up, and 40 minutes for a scale down."
 
 Vector lets you add custom up-to-down and down-to-down cooldown periods.
 You create your policies and alarms in your Auto Scaling Groups like
-normal, and then *disable* the alarm you want a custom cooldown period
-applied to. Then you tell Vector what cooldown periods to use, and he
-does the rest.
+normal, and then *disable* the alarms tied to the scale down policy.
+Then you tell Vector what cooldown periods to use, and he does the rest.
 
 ### Multiple Alarms
 
