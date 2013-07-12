@@ -69,6 +69,15 @@ your scaledown policy doesn't quickly undo Vector's hard work. You
 probably want to set `up-to-down-cooldown` to be close to the size of
 your `lookahead-window`.
 
+### Timezones
+
+If you specify a timezone (either explicitly or via the system
+timezone), Vector will use DST-aware time calculations when evaluating
+lookback windows. If you don't specify a timezone and your system time
+is UTC, then 8AM on Monday morning after DST ends will look back 168
+hours - which is 7AM on the previous Monday.  Predictive scaling would
+be off by one hour for a whole week in that case.
+
 ## Flexible Down Scaling
 
 ### Different Cooldown Periods
