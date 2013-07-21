@@ -46,33 +46,7 @@ module Vector
 
     def hlog(string)
       return unless @@enabled
-
-      tmp_components = @components.dup
-      level = 0
-      if @last_components
-        @last_components.each do |last_c|
-          break if tmp_components.empty?
-          if last_c == tmp_components[0]
-            level += 1
-            tmp_components.shift
-          else
-            break
-          end
-        end
-      end
-
-      tmp_components.each do |component|
-        name = if component.respond_to? :name
-                 component.name
-               else
-                 component.to_s
-               end
-        puts "#{"  " * level}#{name}"
-        level += 1
-      end
-
-      puts "#{"  " * level}#{string}"
-      @last_components = @components.dup
+      puts "[#{@components.join ','}] #{string}"
     end
   end
 end

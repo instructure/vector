@@ -15,66 +15,68 @@ module Vector
       def run_for(group, ps_check_procs)
         result = { :triggered => false }
 
-        hlog_ctx("group: #{group.name}") do
-          # don't check if no config was specified
-          if @up_down_cooldown.nil? && @down_down_cooldown.nil?
-            hlog("No cooldown periods specified, exiting")
-            return result
-          end
-
-          # don't bother checking for a scaledown if desired capacity is
-          # already at the minimum size...
-          if group.desired_capacity == group.min_size
-            hlog("Group is already at minimum size, exiting")
-            return result
-          end
-
-          scaledown_policies = group.scaling_policies.select do |policy|
-            policy.scaling_adjustment < 0
-          end
-
-          scaledown_policies.each do |policy|
-            hlog_ctx("policy: #{policy.name}") do
-              # TODO: support adjustment types other than ChangeInCapacity here
-              if policy.adjustment_type == "ChangeInCapacity" &&
-                 ps_check_procs.any? {|ps_check_proc|
-                   ps_check_proc.call(group.desired_capacity + policy.scaling_adjustment) }
-                hlog("Predictive scaleup would trigger a scaleup if group were shrunk")
-                next
-              end
-
-              alarms = policy.alarms.keys.map do |alarm_name|
-                @cloudwatch.alarms[alarm_name]
-              end
-
-              # only consider disabled alarms (enabled alarms will trigger
-              # the policy automatically)
-              disabled_alarms = alarms.select do |alarm|
-                !alarm.enabled?
-              end
-
-              unless disabled_alarms.all? {|alarm| alarm.state_value == "ALARM" }
-                hlog("Not all alarms are in ALARM state")
-                next
-              end
-
-              unless outside_cooldown_period(group)
-                hlog("Group is not outside the specified cooldown periods")
-                next
-              end
-
-              unless has_eligible_scaledown_instance(group)
-                hlog("Group does not have an instance eligible for scaledown due to max_sunk_cost")
-                next
-              end
-
-              hlog("Executing policy")
-              policy.execute(:honor_cooldown => true)
-
-              result[:triggered] = true
-
-              # no need to evaluate other scaledown policies
+        hlog_ctx("fds") do
+          hlog_ctx("group:#{group.name}") do
+            # don't check if no config was specified
+            if @up_down_cooldown.nil? && @down_down_cooldown.nil?
+              hlog("No cooldown periods specified, exiting")
               return result
+            end
+
+            # don't bother checking for a scaledown if desired capacity is
+            # already at the minimum size...
+            if group.desired_capacity == group.min_size
+              hlog("Group is already at minimum size, exiting")
+              return result
+            end
+
+            scaledown_policies = group.scaling_policies.select do |policy|
+              policy.scaling_adjustment < 0
+            end
+
+            scaledown_policies.each do |policy|
+              hlog_ctx("policy:#{policy.name}") do
+                # TODO: support adjustment types other than ChangeInCapacity here
+                if policy.adjustment_type == "ChangeInCapacity" &&
+                   ps_check_procs.any? {|ps_check_proc|
+                     ps_check_proc.call(group.desired_capacity + policy.scaling_adjustment) }
+                  hlog("Predictive scaleup would trigger a scaleup if group were shrunk")
+                  next
+                end
+
+                alarms = policy.alarms.keys.map do |alarm_name|
+                  @cloudwatch.alarms[alarm_name]
+                end
+
+                # only consider disabled alarms (enabled alarms will trigger
+                # the policy automatically)
+                disabled_alarms = alarms.select do |alarm|
+                  !alarm.enabled?
+                end
+
+                unless disabled_alarms.all? {|alarm| alarm.state_value == "ALARM" }
+                  hlog("Not all alarms are in ALARM state")
+                  next
+                end
+
+                unless outside_cooldown_period(group)
+                  hlog("Group is not outside the specified cooldown periods")
+                  next
+                end
+
+                unless has_eligible_scaledown_instance(group)
+                  hlog("Group does not have an instance eligible for scaledown due to max_sunk_cost")
+                  next
+                end
+
+                hlog("Executing policy")
+                policy.execute(:honor_cooldown => true)
+
+                result[:triggered] = true
+
+                # no need to evaluate other scaledown policies
+                return result
+              end
             end
           end
         end

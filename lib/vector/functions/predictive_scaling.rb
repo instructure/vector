@@ -14,80 +14,83 @@ module Vector
       def run_for(group)
         result = { :check_procs => [], :triggered => false }
 
-        hlog_ctx "group: #{group.name}" do
-          return result if @lookback_windows.length == 0
+        hlog_ctx "ps" do
+          hlog_ctx "group:#{group.name}" do
+            return result if @lookback_windows.length == 0
 
-          scaleup_policies = group.scaling_policies.select do |policy|
-            policy.scaling_adjustment > 0
-          end
+            scaleup_policies = group.scaling_policies.select do |policy|
+              policy.scaling_adjustment > 0
+            end
 
-          scaleup_policies.each do |policy|
-            hlog_ctx "policy: #{policy.name}" do
+            scaleup_policies.each do |policy|
+              hlog_ctx "policy:#{policy.name}" do
 
-              policy.alarms.keys.each do |alarm_name|
-                alarm = @cloudwatch.alarms[alarm_name]
-                hlog_ctx "alarm: #{alarm.name} (metric #{alarm.metric.name})" do
+                policy.alarms.keys.each do |alarm_name|
+                  alarm = @cloudwatch.alarms[alarm_name]
+                  hlog_ctx "alarm:#{alarm.name}" do
+                    hlog "Metric #{alarm.metric.name}"
 
-                  unless alarm.enabled?
-                    hlog "Skipping disabled alarm"
-                    next
-                  end
+                    unless alarm.enabled?
+                      hlog "Skipping disabled alarm"
+                      next
+                    end
 
-                  # Note that everywhere we say "load" what we mean is
-                  # "metric value * number of nodes"
-                  now_load, now_num = load_for(group, alarm.metric,
-                    Time.now, @valid_period)
+                    # Note that everywhere we say "load" what we mean is
+                    # "metric value * number of nodes"
+                    now_load, now_num = load_for(group, alarm.metric,
+                      Time.now, @valid_period)
 
-                  if now_load.nil?
-                    hlog "Could not get current total for metric"
-                    next
-                  end
+                    if now_load.nil?
+                      hlog "Could not get current total for metric"
+                      next
+                    end
 
-                  @lookback_windows.each do |window|
-                    hlog_ctx "window: #{window.inspect}" do
-                      then_load, = load_for(group, alarm.metric,
-                        Time.now - window, @valid_period)
+                    @lookback_windows.each do |window|
+                      hlog_ctx "window:#{window.inspect.gsub ' ', ''}" do
+                        then_load, = load_for(group, alarm.metric,
+                          Time.now - window, @valid_period)
 
-                      if then_load.nil?
-                        hlog "Could not get past total value for metric"
-                        next
-                      end
+                        if then_load.nil?
+                          hlog "Could not get past total value for metric"
+                          next
+                        end
 
-                      # check that the past total utilization is within
-                      # threshold% of the current total utilization
-                      if @valid_threshold &&
-                        !Vector.within_threshold(@valid_threshold, now_load, then_load)
-                        hlog "Past metric total value not within threshold (current #{now_load}, then #{then_load})"
-                        next
-                      end
+                        # check that the past total utilization is within
+                        # threshold% of the current total utilization
+                        if @valid_threshold &&
+                          !Vector.within_threshold(@valid_threshold, now_load, then_load)
+                          hlog "Past metric total value not within threshold (current #{now_load}, then #{then_load})"
+                          next
+                        end
 
-                      past_load, = load_for(group, alarm.metric,
-                        Time.now - window + @lookahead_window,
-                        alarm.period)
+                        past_load, = load_for(group, alarm.metric,
+                          Time.now - window + @lookahead_window,
+                          alarm.period)
 
-                      if past_load.nil?
-                        hlog "Could not get past + #{@lookahead_window.inspect} total value for metric"
-                        next
-                      end
+                        if past_load.nil?
+                          hlog "Could not get past + #{@lookahead_window.inspect} total value for metric"
+                          next
+                        end
 
-                      # now take the past total load and divide it by the
-                      # current number of instances to get the predicted value
-                      check_proc = Proc.new do |num_nodes|
-                        predicted_value = past_load.to_f / num_nodes
-                        hlog "Predicted #{alarm.metric.name}: #{predicted_value} (#{num_nodes} nodes)"
+                        # now take the past total load and divide it by the
+                        # current number of instances to get the predicted value
+                        check_proc = Proc.new do |num_nodes|
+                          predicted_value = past_load.to_f / num_nodes
+                          hlog "Predicted #{alarm.metric.name}: #{predicted_value} (#{num_nodes} nodes)"
 
-                        check_alarm_threshold(alarm, predicted_value)
-                      end
-                      result[:check_procs] << check_proc
+                          check_alarm_threshold(alarm, predicted_value)
+                        end
+                        result[:check_procs] << check_proc
 
-                      if check_proc.call(now_num)
-                        hlog "Executing policy"
-                        policy.execute(honor_cooldown: true)
+                        if check_proc.call(now_num)
+                          hlog "Executing policy"
+                          policy.execute(honor_cooldown: true)
 
-                        result[:triggered] = true
+                          result[:triggered] = true
 
-                        # don't need to evaluate further windows or policies on this group
-                        return result
+                          # don't need to evaluate further windows or policies on this group
+                          return result
+                        end
                       end
                     end
                   end
