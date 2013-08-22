@@ -7,9 +7,17 @@ module Vector
 
       def initialize(options)
         @cloudwatch = options[:cloudwatch]
+        @dry_run = options[:dry_run]
         @up_down_cooldown = options[:up_down_cooldown]
         @down_down_cooldown = options[:down_down_cooldown]
         @max_sunk_cost = options[:max_sunk_cost]
+        @variable_thresholds = options[:variable_thresholds]
+        @n_low = options[:n_low]
+        @n_high = options[:n_high]
+        @m = options[:m]
+        @g_low = options[:g_low]
+        @g_high = options[:g_high]
+        @debug_variable_thresholds = options[:print_variable_thresholds]
       end
 
       def run_for(group, ps_check_procs)
@@ -38,6 +46,7 @@ module Vector
               hlog_ctx("policy:#{policy.name}") do
                 # TODO: support adjustment types other than ChangeInCapacity here
                 if policy.adjustment_type == "ChangeInCapacity" &&
+                   ps_check_procs &&
                    ps_check_procs.any? {|ps_check_proc|
                      ps_check_proc.call(group.desired_capacity + policy.scaling_adjustment) }
                   hlog("Predictive scaleup would trigger a scaleup if group were shrunk")
@@ -54,11 +63,76 @@ module Vector
                   !alarm.enabled?
                 end
 
+                # Do this logic first in case the user is just trying to print out
+                # the thresholds.
+                if @variable_thresholds
+                  # variable_thresholds currently requires a CPUUtilization alarm to function
+                  vt_cpu_alarm = disabled_alarms.find {|alarm| alarm.metric_name == "CPUUtilization" }
+
+                  # remove this alarm from the check, since we're not checking its alarm status
+                  # below.
+                  disabled_alarms.delete(vt_cpu_alarm)
+
+                  unless vt_cpu_alarm
+                    hlog("Variable thresholds requires an alarm on CPUUtilization, skipping")
+                    next
+                  end
+
+                  @n_low ||= group.min_size + 1
+                  @n_high ||= group.max_size
+                  @m ||= vt_cpu_alarm.threshold / 100
+
+                  if @g_low == @g_high
+                    hlog("g_low == g_high (#{@g_low}), not attempting to use flexible thresholds.")
+                    next
+                  end
+
+                  if @n_low == @n_high
+                    hlog("n_low == n_high (#{@n_low}), not attempting to use flexible thresholds.")
+                    next
+                  end
+
+                  if @debug_variable_thresholds
+                    puts "  n_low: #{@n_low}"
+                    puts " n_high: #{@n_high}"
+                    puts "      m: #{@m}"
+                    puts "  g_low: #{@g_low}"
+                    puts " g_high: #{@g_high}"
+                    puts
+                    puts "  N  Threshold"
+                    ([@n_low, group.min_size].min + 1).upto([@n_high, group.max_size].max) do |i|
+                      puts " %2d  %.1f%%" % [i, (variable_threshold(i, @n_low, @n_high, @m, @g_low, @g_high) * 100)]
+                    end
+                    next
+                  end
+                end
+
                 unless disabled_alarms.all? {|alarm| alarm.state_value == "ALARM" }
                   hlog("Not all alarms are in ALARM state")
                   next
                 end
 
+                if @variable_thresholds
+                  threshold = variable_threshold(group.desired_capacity, @n_low, @n_high, @m, @g_low, @g_high)
+
+                  stats = vt_cpu_alarm.metric.statistics(
+                    :start_time => Time.now - (vt_cpu_alarm.period * vt_cpu_alarm.evaluation_periods),
+                    :end_time => Time.now,
+                    :statistics => [ vt_cpu_alarm.statistic ],
+                    :period => vt_cpu_alarm.period)
+
+                  if stats.datapoints.length < vt_cpu_alarm.evaluation_periods
+                    hlog("Could not get enough datapoints for checking variable threshold");
+                    next
+                  end
+
+                  if stats.datapoints.any? {|dp| dp[vt_cpu_alarm.statistic.downcase.to_sym] > (threshold * 100) }
+                    hlog("Not all datapoints are beneath the variable threshold #{(threshold * 100).to_i}: #{stats.datapoints}")
+                    next
+                  end
+                end
+
+                outside_cooldown = outside_cooldown_period(group)
                 unless outside_cooldown_period(group)
                   hlog("Group is not outside the specified cooldown periods")
                   next
@@ -69,8 +143,12 @@ module Vector
                   next
                 end
 
-                hlog("Executing policy")
-                policy.execute(:honor_cooldown => true)
+                if @dry_run
+                  hlog("Executing policy (DRY RUN)")
+                else
+                  hlog("Executing policy")
+                  policy.execute(:honor_cooldown => true)
+                end
 
                 result[:triggered] = true
 
@@ -85,6 +163,15 @@ module Vector
       end
 
       protected
+
+      def variable_threshold(n, n_low, n_high, m, g_low, g_high)
+        m_high = g_high * m
+        m_low = g_low * m
+        a = (m_high - m_low).to_f / (n_high - n_low).to_f
+        b = m_low - (n_low * a)
+        res = (a * n + b) * (1.0 - (1.0 / n))
+        res
+      end
 
       def has_eligible_scaledown_instance(group)
         return true if @max_sunk_cost.nil?

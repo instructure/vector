@@ -5,6 +5,7 @@ module Vector
 
       def initialize(options)
         @cloudwatch = options[:cloudwatch]
+        @dry_run = options[:dry_run]
         @lookback_windows = options[:lookback_windows]
         @lookahead_window = options[:lookahead_window]
         @valid_threshold = options[:valid_threshold]
@@ -83,8 +84,12 @@ module Vector
                         result[:check_procs] << check_proc
 
                         if check_proc.call(now_num)
-                          hlog "Executing policy"
-                          policy.execute(honor_cooldown: true)
+                          if @dry_run
+                            hlog "Executing policy (DRY RUN)"
+                          else
+                            hlog "Executing policy"
+                            policy.execute(honor_cooldown: true)
+                          end
 
                           result[:triggered] = true
 

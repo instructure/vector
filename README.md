@@ -123,6 +123,21 @@ renewals - the group will not be scaled down.
 one, or else it's possible Vector may never find eligible nodes for
 scaledown and never scaledown.)
 
+### Variable Thresholds
+
+When deciding to scale down, a static CPU utilization threshold may be
+inefficient. For example, if there are 2 nodes running, and you have a
+minimum of 2, and the average CPU is 75%, removing 1 node would
+theoretically result in the remaining 2 nodes running at > 100%. However,
+with 20 nodes running, at an average CPU of 75%, removing 1 node will
+only result in an average CPU of 79% across the remaining 19 nodes.
+
+When there are more nodes running, you can be more aggressive about
+removing nodes without overloading the remaining nodes. Variable
+thresholds allow you to express this.
+
+You can enable variable thresholds with `--fds-variable-thresholds`.
+
 ### Integration with Predictive Scaling
 
 Before scaling down, and if Predictive Scaling is in effect, Vector will
