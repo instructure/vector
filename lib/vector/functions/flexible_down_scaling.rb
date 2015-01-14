@@ -130,9 +130,10 @@ module Vector
                     hlog("Not all datapoints are beneath the variable threshold #{(threshold * 100).to_i}: #{stats.datapoints}")
                     next
                   end
+
+                  hlog("Variable threshold: #{(threshold * 100).to_i}, #{group.desired_capacity} nodes")
                 end
 
-                outside_cooldown = outside_cooldown_period(group)
                 unless outside_cooldown_period(group)
                   hlog("Group is not outside the specified cooldown periods")
                   next
