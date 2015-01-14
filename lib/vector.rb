@@ -46,7 +46,11 @@ module Vector
 
     def hlog(string)
       return unless @@enabled
-      puts "[#{@components.join ','}] #{string}"
+      puts "[#{hlog_ctx_string}] #{string}"
+    end
+
+    def hlog_ctx_string
+      @components.join ','
     end
   end
 end

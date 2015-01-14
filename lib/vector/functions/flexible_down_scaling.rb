@@ -48,7 +48,7 @@ module Vector
                 if policy.adjustment_type == "ChangeInCapacity" &&
                    ps_check_procs &&
                    ps_check_procs.any? {|ps_check_proc|
-                     ps_check_proc.call(group.desired_capacity + policy.scaling_adjustment) }
+                     ps_check_proc.call(group.desired_capacity + policy.scaling_adjustment, self) }
                   hlog("Predictive scaleup would trigger a scaleup if group were shrunk")
                   next
                 end

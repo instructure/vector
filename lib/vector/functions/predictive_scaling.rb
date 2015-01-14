@@ -75,15 +75,29 @@ module Vector
 
                         # now take the past total load and divide it by the
                         # current number of instances to get the predicted value
-                        check_proc = Proc.new do |num_nodes|
+
+                        # (we capture our original log context here in order to display
+                        # the source of these checks later when this proc is called by
+                        # scaledown stuff).
+                        orig_ctx = hlog_ctx_string
+                        check_proc = Proc.new do |num_nodes, logger|
                           predicted_value = past_load.to_f / num_nodes
-                          hlog "Predicted #{alarm.metric.name}: #{predicted_value} (#{num_nodes} nodes)"
+
+                          log_str = "Predicted #{alarm.metric.name}: #{predicted_value} (#{num_nodes} nodes)"
+
+                          # Tack on the original context if we're in a different logger
+                          # (for the case where this is called during scaledown checks).
+                          if orig_ctx != logger.hlog_ctx_string
+                            log_str += " (from #{orig_ctx})"
+                          end
+
+                          logger.hlog log_str
 
                           check_alarm_threshold(alarm, predicted_value)
                         end
                         result[:check_procs] << check_proc
 
-                        if check_proc.call(now_num)
+                        if check_proc.call(now_num, self)
                           if @dry_run
                             hlog "Executing policy (DRY RUN)"
                           else
